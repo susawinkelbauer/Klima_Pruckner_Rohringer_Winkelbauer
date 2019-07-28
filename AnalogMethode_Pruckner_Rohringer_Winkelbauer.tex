@@ -1,0 +1,152 @@
+\documentclass[12pt]{article}
+\usepackage{geometry}
+\geometry{a4paper}
+\usepackage{graphicx}
+\usepackage{german}
+\usepackage[utf8]{inputenc}
+
+
+\usepackage{float}
+%\usepackage{wrapfig}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{graphicx}
+\usepackage{amsmath}
+%\usepackage[table,xcdraw]{xcolor}
+%\usepackage[normalem]{ulem}
+%\useunder{\uline}{\ul}{}
+
+\linespread{1.2}
+\graphicspath{{Bilder/}}
+
+\begin{document}
+
+\begin{titlepage}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\centering
+
+\textsc{\LARGE Universität Wien}\\[1.5cm] 
+\textsc{\Large Klimamodellierung Übung}\\[0.5cm] 
+\textsc{\large Projektdokumentation}\\[0.5cm] 
+
+\HRule \\[0.4cm]
+{ \huge \bfseries Analog Methode}\\[0.4cm] 
+\HRule \\[1.5cm]
+
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+\emph{Author:}\\
+Viktoria \textsc{Pruckner}
+Hanna \textsc{Rohringer}
+Susanna \textsc{Winkelbauer}
+\end{flushleft}
+\end{minipage}
+~
+\begin{minipage}{0.4\textwidth}
+\begin{flushright} \large
+\emph{Leiter:} \\
+Georg \textsc{Seyerl}\\
+Sebastian \textsc{Lehner}
+\end{flushright}
+\end{minipage}\\[4cm]
+
+{\large \today}\\[3cm]
+\vfill
+\end{titlepage}
+
+\tableofcontents 
+
+\newpage
+\section{Einleitung}
+Mithilfe der Reanalysedaten der japanischen meteorologischen Agentur JRA-55 (Japanese 55-year Reanalysis) und Beobachtungsdaten der Zentralanstalt für Meteorologie und Geodynamik (ZAMG) soll eine Kreuzvalidierung durchgeführt werden.\\
+Da in der Datenanalyse oft mit zeitlich und räumlich sehr großen Datenmengen gearbeitet wird, wenden wir eine EOF (Empirical Orthogonal Function) - Analyse an um die Datendimension zu verringern. Ziel hierbei ist es den gesamten Datensatz durch so wenig EOFs wie möglich möglichst genau darzustellen ohne wesentliche Informationen zu verlieren.\\
+Wir wollen aus GCMs Informationen über das Klima auf der regionalen Skala ableiten. Dafür wenden wir statistisch empirisches Downscaling an und suchen uns Transferfunktionen von der LASC (Large Scale) auf die LOSC (Local Scale).\\
+Als Downscalingverfahren verwenden wir die Analogmethode, welche auf Basis der Hauptkomponentenanalyse arbeitet und statistisch ähnliche Verteilungsmuster in den großräumigen meteorologischen Feldern sucht. Durch Minimierung der Distanz der PCs wird das ähnlichste Feld determiniert und angenommen, dass diese Ähnlichkeit von der großen Skala ebenso auf die lokalskaligen Wettererscheinungen übernommen werden kann.\\
+\section{Durchführung}
+\subsection{Daten Download}
+Die Reanalysedaten JRA-55 werden über das Research Data Archive des National Center of Atmospheric Research (NCAR) heruntergeladen.\\
+Folgende Parameter werden in 6 stündlicher Auflösung über eine definierte Domäne von 10$ ^\circ $ West bis 25$ ^\circ $ Ost und 32.5$ ^\circ $ Nord bis 67.5$ ^\circ $ Nord über den gesamten verfügbaren Zeitraum (1958 - 2018) heruntergeladen:
+
+\begin{itemize} 
+	\item Luftdruck am Boden (SLP)
+	\item spezifische Feuchte in 700 hPa (SPFH)
+	\item relative Feuchte in 700 hPa (RH)
+\end{itemize}
+\vspace{3mm}
+Die SPARTACUS Beobachtungsdaten von der ZAMG liegen auf einem 1x1km Gitter mit täglicher Auflösung vor und beschreiben die räumliche Verteilung der Lufttemperatur und Niederschlagssumme in Österreich. 
+\subsection{Preprocessing}
+Da wir auf täglicher Basis arbeiten, müssen unsere Reanalysedaten zu aller erst auf den Tag gemittelt werden.\\
+Außerdem interessieren wir uns nur für die Veränderungen, also für die Stationen wo sich viel tut, deshalb berechnen wir die Anomalien indem wir die 
+Stationsmittelwerte von den Stationsdaten abziehen. Hierzu wird zum jeweiligen Target Day ein Zeitfenster von $ \pm $10 Tagen bei der Mittelwertsbildung berücksichtigt und der Mittelwert für jeden Tag des Jahres berechnet, sodass 365 Mittelwerte für jeden Gitterpunkt resultieren. Diese Mittelwerte werden anschließend von den Stationswerten abgezogen um die Anomalien zu erhalten.\\
+Um mögliche Probleme wegen der unterschiedlichen Größenordnungen der verschiedenen Parameterfelder zu vermeiden werden die Anomalien normiert. Hierzu wird die Standardabweichung für jedes Zeitfenster TD $\pm$10 Tage über die gesamte räumliche Dimension berechnet und die Anomalien durch die jeweilige Standardabweichung dividiert.\\
+\subsection{Anwendung Analog-Methode}
+Mit den nomierten Anomalien kann nun die eigentliche Analog Methode durchgeführt werden.\\
+Es wird eine multivariate EOF-Analyse für jeden Tag im Jahr erstellt um die Dimension der Daten zu verringern. Da es in xarray keine Funktion hierführ gibt müssen die Daten erst in iris cubes umgewandelt werden um dann die multivariate EOF-Analyse durchzuführen. Man erhält daraus die EOFs und PCs für jeden Tag. Die Anzahl der EOFs wird über die erklärte Varianz, welche auf 90 Prozent gesetzt wird, determiniert.\\
+Durch Projektion der Reanalysedaten in den EOF-Raum erhält man die Pseudo PCs. Jedes Feld kann nun als Linearkombination aus EOF mit zugehörigem (Pseudo) PC dargestellt werden.\\
+Anschließend wird für jeden zeitlichen Punkt der Daten die Norm zwischen Pseudo PCs und PCs bestimmt. Hierzu werden die Pseudo PCs von den PCs abgezogen, quadriert und aufsummiert. Es resultiert eine Norm für jeden Zeitpunkt.\\ Von diesen Normen wird nun das Minimum gesucht (argmin Funktion), dieses entspricht dem Tag welcher dem gesuchten am ähnlichsten ist, also unserem Analogon.
+\subsection{Validierung}
+Die Transferfunktionen der Analog Methode müssen mit einem Teil der Daten kalibriert und mit einem anderen Teil validiert werden. Bei uns wird ein Jahr aus den Reanalysedaten nicht in die EOF-Berechenung einbezogen um damit die Validierung durchzuführen.
+
+\newpage
+\section{Ergebnisse}
+Es konnte mithilfe der Reanalysedaten und der multivariaten EOF Analyse ein Analogon für jeden Tag des gesamten Zeitraums gefunden werden. Das letzte Jahr (2018) wird zur Validierung verwendet und fließt nicht in die EOF-Analyse ein. Somit ergeben sich 21915 Tage mit zugehörigen Analogons. Ein Teil der gefundenen Tage ist in Abbildung \ref{Abb1} zu sehen. Die gesamte Liste steht im beigelegten Python Skript zur Verfügung.\\
+\begin{figure} [!h]
+\centering
+\includegraphics[scale = 0.95]{Tage.png}
+\caption{Liste der gefundenen Analogons zu jedem untersuchten Tag.}
+\label{Abb1}
+\end{figure}
+Für den letzten Tag der Liste werden die Anomalien der drei Parameter P, SPFH und RH, die in die EOF Analyse einfließen, mit denen des Analogons verglichen(siehe Abbildung \ref{Abb2}). Für alle drei Parameter lassen sich Ähnlichkeiten der Anomalien zwischen betrachtetem Tag und zugehörigem Analogon erkennen. Im Druckfeld sind, vor allem am 31.12.2017, das Islandtief und Azorenhoch sehr gut zu erkennen. Demzufolge gibt es an beiden Tagen ein Minimum im Norden Europas, einmal östlich und einmal westlich von Großbritannien. Nach Süden hin nimmt der Druck zu. Der höchste Druck liegt im Fall vom 31.12.2017 über Teilen Spaniens und westlich davon, im zugehörigen Anaologon sind die höchsten Druckwerte an der Nordküste Afrikas zu erkennen. \\
+Die beiden Feuchtemaße zeigen an beiden Tagen ein Maximum über Skandinavien. Ein weiteres Maximum befindet sich im Osten Europas. Am 31.12.2017 liegt dieses Maximum etwas weiter im Norden, am 8.1.1991 etwas weiter im Süden. Am 31.12.2017 befindet sich ein Maximum über Frankreich, am 8.1.1991 liegt dieses Feuchtefeld etwas weiter im Norden, an der Südküste von Großbritannien. Das Gebiet mit der geringsten Feuchtigkeit liegt am 31.12.2017 über dem Mittelmeerraum und erstreckt sich bis ins Landesinnere von Südosteuropa. Auch am 8.1.1991 ist diese Minimum im Süden Europas, wenn auch mit schwächerer Intensität, zu erkennen. An beiden Tagen fällt ein kleines Gebiet mit geringer Feuchtigkeit über Mitteleuropa auf, das in ihrer Lage und Ausprägung sehr starke Ähnlichkeiten aufweist.
+
+\begin{figure} [!h]
+\centering
+\includegraphics[scale = 0.75]{Anomalien.png} %scale = 0.95
+\caption{Anomalien der drei Parameter P, SPFH und RH am 31.12.2017 und dem dazugehörigen Analogon dem 8.1.1991.}
+\label{Abb2}
+\end{figure}
+
+Abbildung \ref{Abb3} zeigt die PCs und den ersten EOF des Druckfeldes. Es werden bei einer erklärten Varianz von 90 Prozent 49 EOF Felder und $49 * time range$ PCs, also 49 PCs pro Tag, gefunden. Das gesuchte Feld F kann nun als Linearkombination aus den EOFs und PCs wie folgt gebildet werden:
+
+\hspace{2cm} $ F=PC_1*EOF_1+PC_2*EOF_2+...+PC_i*EOF_i$
+
+\begin{figure} [!h]
+\centering
+\includegraphics[scale = 0.7]{PCEOF.png} %scale = 0.95
+\caption{PCs vom 31.12.2017 (\textit{links}) und Feld des ersten EOFs des Druckes (\textit{rechts}).}
+\label{Abb3}
+\end{figure}
+
+Abbildung \ref{Abb4} zeigt eine Gegenüberstellung für alle drei Parameter von den Anomalien der tatsächlichen Felder mit den Anomalien der mit EOF und PC rekonstruierten Felder. Das rekonstruierte Druckfeld zeigt ein sehr ähnliches Muster wie das tatsächliche Feld. Wieder ist der steigende Druck von Nord nach Süd gut zu sehen. Auch im Mittel treten keine großen Unterschiede auf. So liegt zwischen tatsächlichem und rekonstruiertem Feld über die gesamte betrachtete Fläche im Mittel ein Unterschied von 0.02 hPa.\\
+Auch die beiden Feuchtemaße zeigen zwischen tatsächlichen und rekonstruierten Feldern eine recht gute Übereinstimmung. Das Maximum im Nordosten Europas tritt jedoch etwas weiter westlich über Norddeutschland auf und auch das Feuchtigkeits Minimum liegt im rekonstruierten Feld weiter im Westen über dem Mittelmeer. Bei der relativen Feuchte werden im Mittel über die gesamte Fläche die selben Werte wie im tatsächlichen Feld erreicht, bei der spezifischen Feuchte werden diese jedoch um 0.17 g/kg überschätzt. Grund dafür ist das besonders stark ausgeprägte Maximum im Norden Deutschlands welches beim tatsächlichen Feld großteils außerhalb der betrachteten Domäne liegt.
+
+\begin{figure} [!h]
+\centering
+\includegraphics[scale = 0.75]{rek.png} %scale = 0.95
+\caption{\textit{links:} Anomalien von Druck sowie rlativer und spezifischer Feuchte wie in Abb. \ref{Abb2}, \textit{rechts:} durch Linearkombination von PC und EOF rekonstruierte Felder.}
+\label{Abb4}
+\end{figure}
+
+Zur Validierung wird der Root Mean Square Error (RMSE) herangezogen. Tabelle \ref{Tab1} zeigt die berechneten RMSE Werte zwischen den tatsächlichen Feldern, den Analogons und den durch EOFs rekonstruierten Feldern.\\
+Der RMSE zwischen tatsächlichem Feld(31.12.2017) und Analogon(8.1.1991) erreicht bei den einzelnen Parametern nicht unbedingt sein absolutes Minimum. So liegen beispielsweise die RMSE Werte beim Druck (MSLP) am Tag des Analogons mit 0.08 höher als an den unmittelbaren Tagen danach (am 9.1. RMSE von 0.03). Betrachtet man jedoch alle drei Parameter gleichzeitig so liegt ein RMSE von 0.05 vor, das absolute Minimum von allen betrachteten Tagen.\\
+Auch beim durch die EOFs rekonstruierten Feld treten relativ niedrige RMSE Werte auf, einzig der Wert der spezifischen Feuchte (SPFH) erreicht knapp 0,2. Dies ist jedoch schon in der obigen Abbildung (Abb \ref{Abb4}) gut zu sehen, hier weicht das rekonstruierte Feld des SPFH am stärksten vom tatsächlichen Feld ab.
+
+\begin{table}[!h]
+\centering
+\begin{tabular}{|
+>{\columncolor[HTML]{C0C0C0}}l |c|c|}
+\hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{656565}{\color[HTML]{FFFFFF} \textbf{RMSE}}} & \multicolumn{1}{l|}{\cellcolor[HTML]{656565}{\color[HTML]{EFEFEF} \textbf{Analogon}}} & \multicolumn{1}{l|}{\cellcolor[HTML]{656565}{\color[HTML]{EFEFEF} \textbf{rek. Feld}}} \\ \hline
+{\color[HTML]{333333} MSLP}                                                        & 0.08                                                                                  & 0.02                                                                                   \\ \hline
+{\color[HTML]{333333} RH}                                                          & 0.04                                                                                  & 0.03                                                                                   \\ \hline
+{\color[HTML]{333333} SPFH}                                                        & 0.03                                                                                  & 0.17                                                                                   \\ \hline
+{\color[HTML]{333333} Gesamt}                                                      & \textbf{0.05}                                                                         & \textbf{0.07}                                                                          \\ \hline
+\end{tabular}
+\caption{Vergleich der RMSE Werte von tatsächlichem Feld zu Analogon bzw. rekonstruiertem Feld.}
+\label{Tab1}
+\end{table}
+
+\section{Schlussfolgerung}
+Nach anfänglichen Schwierigkeiten konnten wir die Analog-Methode erfolgreich umsetzen, was sich in den angestellten Gegenüberstellungen widerspiegelt. Ziel der Analog-Methode ist für jeden Tag im Jahr jenen Tag zu finden, an dem verschiedene meteorologische Felder ein ähnliches Verteilungsmuster aufweisen. Ein Vergleich der Anomalien des betrachteten Tages mit den Anomalien des errechneten Analogons weist eindeutig Ähnlichkeiten auf. Gleiches gilt auch für den Vergleich der Anomalien des tatsächlichen Feldes mit jenen Feldern, die sich aus der Linearkombination von PC und EOF ergeben. Zum Schluss wird die Ähnlichkeit der betrachteten Felder mit Hilfe des RSME quantifiziert. Die sehr geringen Werte des RSME lassen lediglich auf geringe Abweichungen schließen. 
+\end{document}
